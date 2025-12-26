@@ -2,27 +2,11 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
-// https://vitejs.dev/config/
-export default defineConfig(() => ({
-  server: {
-    host: true
-  },
-
-  preview: {
-    host: true,
-    port: Number(process.env.PORT) || 8080,
-    allowedHosts: [
-      ".railway.app"
-    ]
-  },
-
-  plugins: [
-    react()
-  ],
-
+export default defineConfig({
+  plugins: [react()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
   },
-}));
+});
