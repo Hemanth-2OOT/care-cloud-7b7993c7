@@ -4,10 +4,11 @@ import { Shield, AlertTriangle, Sparkles } from "lucide-react";
 
 interface ToxicityMeterProps {
   value: number; // 0-100
+  message?: string;
   className?: string;
 }
 
-const ToxicityMeter: React.FC<ToxicityMeterProps> = ({ value, className }) => {
+const ToxicityMeter: React.FC<ToxicityMeterProps> = ({ value, message, className }) => {
   const getStatus = () => {
     if (value <= 33) return { label: "Safe", color: "bg-safe", icon: Sparkles };
     if (value <= 66) return { label: "Moderate", color: "bg-moderate", icon: AlertTriangle };
@@ -15,6 +16,12 @@ const ToxicityMeter: React.FC<ToxicityMeterProps> = ({ value, className }) => {
   };
 
   const { label, color, icon: Icon } = getStatus();
+
+  const defaultMessage = value <= 33 
+    ? "Everything looks good! The content appears safe and friendly."
+    : value <= 66
+    ? "Some content may need attention. Take a moment to review flagged items."
+    : "Some concerning content was found. Please review with a trusted adult.";
 
   return (
     <div className={cn("card-friendly p-6", className)}>
@@ -49,7 +56,7 @@ const ToxicityMeter: React.FC<ToxicityMeterProps> = ({ value, className }) => {
             "absolute left-0 top-0 h-full rounded-full transition-all duration-700 ease-out",
             color
           )}
-          style={{ width: `${value}%` }}
+          style={{ width: `${Math.max(value, 5)}%` }}
         />
         {/* Gradient overlay for depth */}
         <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent pointer-events-none" />
@@ -74,11 +81,7 @@ const ToxicityMeter: React.FC<ToxicityMeterProps> = ({ value, className }) => {
       {/* Friendly Message */}
       <div className="mt-4 p-3 rounded-xl bg-primary/5 border border-primary/10">
         <p className="text-sm text-foreground/80">
-          {value <= 33 
-            ? "Everything looks good! The content appears safe and friendly."
-            : value <= 66
-            ? "Some content may need attention. Take a moment to review flagged items."
-            : "Some concerning content was found. Please review with a trusted adult."}
+          {message || defaultMessage}
         </p>
       </div>
     </div>
