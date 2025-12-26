@@ -15,45 +15,21 @@ const Dashboard = () => {
   const [selectedContent, setSelectedContent] = useState<FlaggedContent | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [flaggedItems, setFlaggedItems] = useState<FlaggedContent[]>([
-    {
-      id: "1",
-      content: "This is an example of flagged content that contains potentially harmful language...",
-      harmType: "hate-speech",
-      severity: "medium",
-      reason: "Contains harmful language",
-      explanation: "This content was flagged because it uses words or images that can hurt or scare people. Our goal is to help you understand what's safe and keep you protected online.",
-      timestamp: new Date(Date.now() - 1000 * 60 * 30),
-    },
-    {
-      id: "2",
-      content: "Another example showing different types of concerning content...",
-      harmType: "abuse",
-      severity: "low",
-      reason: "May contain abusive elements",
-      explanation: "This content was marked because it includes language or actions that could be considered unkind or hurtful. Remember, everyone deserves to be treated with respect.",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
-    },
-  ]);
-
-  // Calculate toxicity based on flagged items
-  const toxicityValue = Math.min(
-    100,
-    flaggedItems.reduce((acc, item) => {
-      const severityScore = item.severity === "high" ? 30 : item.severity === "medium" ? 15 : 5;
-      return acc + severityScore;
-    }, 0)
-  );
+  const [toxicityScore, setToxicityScore] = useState(0);
+  const [flaggedItems, setFlaggedItems] = useState<FlaggedContent[]>([]);
+  const [lastMessage, setLastMessage] = useState<string>("No content analyzed yet. Try analyzing some text or an image!");
 
   const handleViewReason = (item: FlaggedContent) => {
     setSelectedContent(item);
     setIsModalOpen(true);
   };
 
-  const handleAnalysisComplete = (results: FlaggedContent[]) => {
+  const handleAnalysisComplete = (results: FlaggedContent[], score: number, message: string) => {
     if (results.length > 0) {
       setFlaggedItems((prev) => [...results, ...prev]);
     }
+    setToxicityScore(score);
+    setLastMessage(message);
   };
 
   const handleLogout = () => {
@@ -129,7 +105,7 @@ const Dashboard = () => {
           <div className="lg:col-span-2 space-y-6">
             {/* Toxicity Meter */}
             <div className="animate-slide-up" style={{ animationDelay: "100ms" }}>
-              <ToxicityMeter value={toxicityValue} />
+              <ToxicityMeter value={toxicityScore} message={lastMessage} />
             </div>
 
             {/* Content Analyzer */}
@@ -150,7 +126,9 @@ const Dashboard = () => {
                 <div>
                   <h3 className="font-bold text-foreground">Detected Content</h3>
                   <p className="text-sm text-muted-foreground">
-                    {flaggedItems.length} item(s) need your attention
+                    {flaggedItems.length === 0 
+                      ? "No issues found yet" 
+                      : `${flaggedItems.length} item(s) need your attention`}
                   </p>
                 </div>
               </div>

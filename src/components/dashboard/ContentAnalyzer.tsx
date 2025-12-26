@@ -7,11 +7,30 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, Image, Upload, Sparkles, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import type { FlaggedContent } from "@/components/dashboard/ReasonModal";
+import type { HarmType, SeverityLevel } from "@/components/badges/StatusBadges";
 
 interface ContentAnalyzerProps {
-  onAnalysisComplete: (results: any) => void;
+  onAnalysisComplete: (results: FlaggedContent[], toxicityScore: number, message: string) => void;
   isAnalyzing: boolean;
   setIsAnalyzing: (value: boolean) => void;
+}
+
+interface AnalysisIssue {
+  harmType: HarmType;
+  severity: SeverityLevel;
+  content: string;
+  reason: string;
+  explanation: string;
+}
+
+interface AnalysisResult {
+  toxicityScore: number;
+  issues: AnalysisIssue[];
+  overallSafe: boolean;
+  friendlyMessage: string;
+  error?: string;
 }
 
 const ContentAnalyzer: React.FC<ContentAnalyzerProps> = ({
@@ -48,21 +67,52 @@ const ContentAnalyzer: React.FC<ContentAnalyzerProps> = ({
 
     setIsAnalyzing(true);
 
-    // Simulate AI analysis - in production this would call the AI API
-    setTimeout(() => {
-      // Mock results for demonstration
-      const mockResults = generateMockResults(textContent);
-      onAnalysisComplete(mockResults);
-      setIsAnalyzing(false);
-      toast({
-        title: "Analysis Complete",
-        description: `Found ${mockResults.length} item(s) to review.`,
+    try {
+      const { data, error } = await supabase.functions.invoke<AnalysisResult>("analyze-text", {
+        body: { text: textContent },
       });
-    }, 2000);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      if (data) {
+        const flaggedContent: FlaggedContent[] = data.issues.map((issue, index) => ({
+          id: crypto.randomUUID(),
+          content: issue.content || textContent.slice(0, 100),
+          harmType: issue.harmType,
+          severity: issue.severity,
+          reason: issue.reason,
+          explanation: issue.explanation,
+          timestamp: new Date(),
+        }));
+
+        onAnalysisComplete(flaggedContent, data.toxicityScore, data.friendlyMessage);
+
+        toast({
+          title: data.overallSafe ? "Content is Safe! 🎉" : "Analysis Complete",
+          description: data.friendlyMessage,
+          variant: data.overallSafe ? "default" : "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Analysis error:", error);
+      toast({
+        title: "Analysis Failed",
+        description: error instanceof Error ? error.message : "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const analyzeImage = async () => {
-    if (!imageFile) {
+    if (!imagePreview) {
       toast({
         title: "No image selected",
         description: "Please upload an image to analyze.",
@@ -73,16 +123,48 @@ const ContentAnalyzer: React.FC<ContentAnalyzerProps> = ({
 
     setIsAnalyzing(true);
 
-    // Simulate AI analysis
-    setTimeout(() => {
-      const mockResults = generateMockImageResults();
-      onAnalysisComplete(mockResults);
-      setIsAnalyzing(false);
-      toast({
-        title: "Analysis Complete",
-        description: "Image has been analyzed for safety.",
+    try {
+      const { data, error } = await supabase.functions.invoke<AnalysisResult>("analyze-image", {
+        body: { imageBase64: imagePreview },
       });
-    }, 2500);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      if (data) {
+        const flaggedContent: FlaggedContent[] = data.issues.map((issue) => ({
+          id: crypto.randomUUID(),
+          content: `[Image] ${issue.content}`,
+          harmType: issue.harmType,
+          severity: issue.severity,
+          reason: issue.reason,
+          explanation: issue.explanation,
+          timestamp: new Date(),
+        }));
+
+        onAnalysisComplete(flaggedContent, data.toxicityScore, data.friendlyMessage);
+
+        toast({
+          title: data.overallSafe ? "Image is Safe! 🎉" : "Analysis Complete",
+          description: data.friendlyMessage,
+          variant: data.overallSafe ? "default" : "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Analysis error:", error);
+      toast({
+        title: "Analysis Failed",
+        description: error instanceof Error ? error.message : "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   return (
@@ -93,7 +175,7 @@ const ContentAnalyzer: React.FC<ContentAnalyzerProps> = ({
         </div>
         <div>
           <h3 className="font-bold text-foreground">AI Content Analyzer</h3>
-          <p className="text-sm text-muted-foreground">Check if content is safe</p>
+          <p className="text-sm text-muted-foreground">Powered by Gemini AI</p>
         </div>
       </div>
 
@@ -138,7 +220,7 @@ const ContentAnalyzer: React.FC<ContentAnalyzerProps> = ({
             {isAnalyzing ? (
               <>
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Analyzing...
+                Analyzing with AI...
               </>
             ) : (
               <>
@@ -204,7 +286,7 @@ const ContentAnalyzer: React.FC<ContentAnalyzerProps> = ({
             {isAnalyzing ? (
               <>
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Analyzing...
+                Analyzing with AI...
               </>
             ) : (
               <>
@@ -218,46 +300,5 @@ const ContentAnalyzer: React.FC<ContentAnalyzerProps> = ({
     </div>
   );
 };
-
-// Mock data generators for demonstration
-function generateMockResults(text: string) {
-  const results = [];
-  const lowerText = text.toLowerCase();
-  
-  if (lowerText.includes("hate") || lowerText.includes("stupid")) {
-    results.push({
-      id: crypto.randomUUID(),
-      content: text.slice(0, 100),
-      harmType: "hate-speech" as const,
-      severity: "medium" as const,
-      reason: "Contains potentially harmful language",
-      explanation: "This content was flagged because it uses words that can hurt or upset people. Using kind words helps everyone feel welcome and respected online.",
-      timestamp: new Date(),
-    });
-  }
-  
-  if (lowerText.includes("hurt") || lowerText.includes("harm")) {
-    results.push({
-      id: crypto.randomUUID(),
-      content: text.slice(0, 100),
-      harmType: "self-harm" as const,
-      severity: "high" as const,
-      reason: "Contains concerning themes",
-      explanation: "This content mentions topics that could be concerning. If you or someone you know is struggling, please talk to a trusted adult or reach out for help.",
-      timestamp: new Date(),
-    });
-  }
-
-  if (results.length === 0 && text.length > 10) {
-    // Safe content
-    return [];
-  }
-
-  return results;
-}
-
-function generateMockImageResults() {
-  return [];
-}
 
 export default ContentAnalyzer;
